@@ -1,0 +1,50 @@
+{
+  "name": "n8n-oneteam",
+  "version": "0.1.0",
+  "description": "n8n nodes for Oneteam: listen to webhook events and run organisation operations",
+  "license": "MIT",
+  "homepage": "https://github.com/FlexAppeal/n8n-oneteam",
+  "keywords": [
+    "n8n-community-node-package",
+    "oneteam"
+  ],
+  "author": {
+    "name": "Oneteam",
+    "email": "support@oneteam.io"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/FlexAppeal/n8n-oneteam.git"
+  },
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc && mkdir -p dist/nodes/Oneteam && cp nodes/Oneteam/*.svg dist/nodes/Oneteam/ && cp nodes/Oneteam/*.json dist/nodes/Oneteam/",
+    "dev": "tsc --watch",
+    "lint": "echo \"No linter configured yet\"",
+    "start:n8n": "N8N_SECURE_COOKIE=false N8N_CUSTOM_EXTENSIONS=./dist n8n"
+  },
+  "files": [
+    "dist"
+  ],
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "credentials": [
+      "dist/credentials/OneteamApi.credentials.js"
+    ],
+    "nodes": [
+      "dist/nodes/Oneteam/Oneteam.node.js",
+      "dist/nodes/Oneteam/OneteamTrigger.node.js"
+    ]
+  },
+  "devDependencies": {
+    "n8n": "^2.38.1",
+    "n8n-workflow": "^1.70.0",
+    "typescript": "^5.8.0"
+  },
+  "peerDependencies": {
+    "n8n-workflow": "*"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
