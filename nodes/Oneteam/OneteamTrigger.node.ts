@@ -24,7 +24,7 @@ export class OneteamTrigger implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Oneteam Trigger',
 		name: 'oneteamTrigger',
-		icon: 'file:oneteam.svg',
+		icon: 'file:oneteam.png',
 		group: ['trigger'],
 		version: 1,
 		subtitle: '={{$parameter["event"]}}',

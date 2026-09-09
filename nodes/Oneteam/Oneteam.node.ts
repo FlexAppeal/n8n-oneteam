@@ -18,7 +18,7 @@ export class Oneteam implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Oneteam',
 		name: 'oneteam',
-		icon: 'file:oneteam.svg',
+		icon: 'file:oneteam.png',
 		group: ['transform'],
 		version: 1,
 		subtitle: '={{$parameter["operation"] + ": " + $parameter["resource"]}}',

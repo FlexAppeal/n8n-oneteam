@@ -18,7 +18,7 @@
   },
   "main": "index.js",
   "scripts": {
-    "build": "tsc && mkdir -p dist/nodes/Oneteam && cp nodes/Oneteam/*.svg dist/nodes/Oneteam/ && cp nodes/Oneteam/*.json dist/nodes/Oneteam/",
+    "build": "tsc && mkdir -p dist/nodes/Oneteam && cp nodes/Oneteam/oneteam.png nodes/Oneteam/*.json dist/nodes/Oneteam/",
     "dev": "tsc --watch",
     "lint": "echo \"No linter configured yet\"",
     "start:n8n": "N8N_SECURE_COOKIE=false N8N_CUSTOM_EXTENSIONS=./dist n8n"
