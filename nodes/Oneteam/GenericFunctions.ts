@@ -210,15 +210,49 @@ export async function listResourceOptions(
 	apiVersion: 'v1' | 'v2' = 'v2',
 ): Promise<Array<{ name: string; value: string }>> {
 	const organisation = await getOrganisation.call(this);
-	const response = await oneteamApiRequest.call(
+	const rows = await listAllPages.call(
 		this,
-		'GET',
 		`/${apiVersion}/organisations/${organisation.id}/${path}`,
 	);
-	const rows = (response.data as IDataObject[]) ?? [];
 
 	return rows.map((row) => ({
 		name: String(row[nameField] ?? row.id),
 		value: String(row.id),
 	}));
+}
+
+async function listAllPages(
+	this: OneteamContext,
+	path: string,
+): Promise<IDataObject[]> {
+	const rows: IDataObject[] = [];
+	const seenCursors = new Set<string>();
+	let cursor: string | undefined;
+
+	do {
+		const response = await oneteamApiRequest.call(
+			this,
+			'GET',
+			path,
+			{},
+			cursor ? { cursor } : {},
+		);
+		rows.push(...((response.data as IDataObject[]) ?? []));
+
+		const meta = response.meta as IDataObject | undefined;
+		const pagination = meta?.pagination as IDataObject | undefined;
+		const nextCursor = pagination?.next_cursor;
+		if (
+			typeof nextCursor !== 'string' ||
+			nextCursor.length === 0 ||
+			seenCursors.has(nextCursor)
+		) {
+			cursor = undefined;
+		} else {
+			seenCursors.add(nextCursor);
+			cursor = nextCursor;
+		}
+	} while (cursor);
+
+	return rows;
 }
