@@ -14,6 +14,21 @@ import {
 	oneteamApiRequest,
 } from './GenericFunctions';
 
+function pushApiRows(
+	returnData: INodeExecutionData[],
+	response: IDataObject,
+): void {
+	const rows = response.data;
+	if (Array.isArray(rows)) {
+		for (const row of rows) {
+			returnData.push({ json: row as IDataObject });
+		}
+		return;
+	}
+
+	returnData.push({ json: (rows as IDataObject) ?? response });
+}
+
 export class Oneteam implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Oneteam',
@@ -44,6 +59,10 @@ export class Oneteam implements INodeType {
 					{ name: 'Employee', value: 'employee' },
 					{ name: 'Organization Message', value: 'feedMessage' },
 					{ name: 'Membership', value: 'membership' },
+					{ name: 'Form', value: 'form' },
+					{ name: 'Course', value: 'course' },
+					{ name: 'Onboarding', value: 'onboarding' },
+					{ name: 'Analytics', value: 'analytics' },
 				],
 				default: 'employee',
 			},
@@ -101,6 +120,106 @@ export class Oneteam implements INodeType {
 					},
 				],
 				default: 'update',
+			},
+			{
+				displayName: 'Operation',
+				name: 'operation',
+				type: 'options',
+				noDataExpression: true,
+				displayOptions: { show: { resource: ['form'] } },
+				options: [
+					{
+						name: 'List',
+						value: 'list',
+						action: 'List forms',
+						description: 'List forms in the organisation',
+					},
+					{
+						name: 'List Submissions',
+						value: 'listSubmissions',
+						action: 'List form submissions',
+						description: 'List submissions for a form',
+					},
+					{
+						name: 'Get Submission',
+						value: 'getSubmission',
+						action: 'Get a form submission',
+						description: 'Get one form submission including answers',
+					},
+				],
+				default: 'list',
+			},
+			{
+				displayName: 'Operation',
+				name: 'operation',
+				type: 'options',
+				noDataExpression: true,
+				displayOptions: { show: { resource: ['course'] } },
+				options: [
+					{
+						name: 'List',
+						value: 'list',
+						action: 'List courses',
+						description: 'List academy courses',
+					},
+				],
+				default: 'list',
+			},
+			{
+				displayName: 'Operation',
+				name: 'operation',
+				type: 'options',
+				noDataExpression: true,
+				displayOptions: { show: { resource: ['onboarding'] } },
+				options: [
+					{
+						name: 'Get Statistics',
+						value: 'statistics',
+						action: 'Get onboarding statistics',
+						description: 'Get the organisation onboarding overview',
+					},
+					{
+						name: 'List User Progress',
+						value: 'userProgress',
+						action: 'List onboarding user progress',
+						description: 'List onboarding progress per employee',
+					},
+				],
+				default: 'statistics',
+			},
+			{
+				displayName: 'Operation',
+				name: 'operation',
+				type: 'options',
+				noDataExpression: true,
+				displayOptions: { show: { resource: ['analytics'] } },
+				options: [
+					{
+						name: 'Get',
+						value: 'get',
+						action: 'Get organisation analytics',
+						description: 'Get organisation analytics for selected metrics',
+					},
+					{
+						name: 'Get Counts',
+						value: 'counts',
+						action: 'Get analytics counts',
+						description: 'Get organisation analytics counts',
+					},
+					{
+						name: 'List Users',
+						value: 'users',
+						action: 'List analytics users',
+						description: 'List users behind the selected metrics',
+					},
+					{
+						name: 'Get Networks',
+						value: 'networks',
+						action: 'Get network analytics',
+						description: 'Get analytics for each network',
+					},
+				],
+				default: 'get',
 			},
 			{
 				displayName: 'First Name',
@@ -325,6 +444,89 @@ export class Oneteam implements INodeType {
 					show: { resource: ['membership'], operation: ['update'] },
 				},
 			},
+			{
+				displayName: 'Form Name or ID',
+				name: 'formId',
+				type: 'options',
+				typeOptions: { loadOptionsMethod: 'getForms' },
+				required: true,
+				default: '',
+				description:
+					'Choose from the list, or specify an ID using an expression.',
+				displayOptions: {
+					show: {
+						resource: ['form'],
+						operation: ['listSubmissions', 'getSubmission'],
+					},
+				},
+			},
+			{
+				displayName: 'Submission ID',
+				name: 'submissionId',
+				type: 'string',
+				required: true,
+				default: '',
+				displayOptions: {
+					show: { resource: ['form'], operation: ['getSubmission'] },
+				},
+			},
+			{
+				displayName: 'Metrics',
+				name: 'metrics',
+				type: 'multiOptions',
+				required: true,
+				default: ['users.active'],
+				options: [
+					{ name: 'Private Messages Created', value: 'private_message.created' },
+					{ name: 'Feed Messages Created', value: 'feed_message.created' },
+					{ name: 'High Fives Created', value: 'highfive.created' },
+					{ name: 'Comments Created', value: 'comment.created' },
+					{ name: 'Users Active', value: 'users.active' },
+					{ name: 'Users Active Weekly', value: 'users.active_weekly' },
+					{ name: 'Users Active Monthly', value: 'users.active_monthly' },
+					{ name: 'Users Invited', value: 'users.invited' },
+					{ name: 'Users Registered', value: 'users.registered' },
+					{ name: 'Users Pending', value: 'users.pending' },
+					{ name: 'Exchanges Created', value: 'exchanges.created' },
+					{ name: 'Exchanges Approved', value: 'exchanges.approved' },
+					{
+						name: 'Exchanges Approved Time',
+						value: 'exchanges.total_approved_time_in_seconds',
+					},
+				],
+				displayOptions: {
+					show: {
+						resource: ['analytics'],
+						operation: ['get', 'counts', 'users'],
+					},
+				},
+			},
+			{
+				displayName: 'From Date',
+				name: 'fromDate',
+				type: 'dateTime',
+				default: '',
+				description: 'Leave empty to use the start of the current month',
+				displayOptions: {
+					show: {
+						resource: ['analytics'],
+						operation: ['get', 'users', 'networks'],
+					},
+				},
+			},
+			{
+				displayName: 'To Date',
+				name: 'toDate',
+				type: 'dateTime',
+				default: '',
+				description: 'Leave empty to use the end of the current month',
+				displayOptions: {
+					show: {
+						resource: ['analytics'],
+						operation: ['get', 'users', 'networks'],
+					},
+				},
+			},
 		],
 	};
 
@@ -344,6 +546,11 @@ export class Oneteam implements INodeType {
 				this: ILoadOptionsFunctions,
 			): Promise<INodePropertyOptions[]> {
 				return listResourceOptions.call(this, 'teams', 'name', 'v1');
+			},
+			async getForms(
+				this: ILoadOptionsFunctions,
+			): Promise<INodePropertyOptions[]> {
+				return listResourceOptions.call(this, 'forms', 'title', 'v1');
 			},
 			async getLanguages(
 				this: ILoadOptionsFunctions,
@@ -491,6 +698,104 @@ export class Oneteam implements INodeType {
 						action,
 					},
 				});
+				continue;
+			}
+
+			if (resource === 'form' && operation === 'list') {
+				const response = await oneteamApiRequest.call(
+					this,
+					'GET',
+					`/v1/organisations/${organisation.id}/forms`,
+				);
+				pushApiRows(returnData, response);
+				continue;
+			}
+
+			if (resource === 'form' && operation === 'listSubmissions') {
+				const formId = this.getNodeParameter('formId', i) as string;
+				const response = await oneteamApiRequest.call(
+					this,
+					'GET',
+					`/v1/organisations/${organisation.id}/forms/${formId}/submissions`,
+				);
+				pushApiRows(returnData, response);
+				continue;
+			}
+
+			if (resource === 'form' && operation === 'getSubmission') {
+				const formId = this.getNodeParameter('formId', i) as string;
+				const submissionId = this.getNodeParameter('submissionId', i) as string;
+				const response = await oneteamApiRequest.call(
+					this,
+					'GET',
+					`/v1/organisations/${organisation.id}/forms/${formId}/submissions/${submissionId}`,
+				);
+				returnData.push({ json: (response.data as IDataObject) ?? response });
+				continue;
+			}
+
+			if (resource === 'course' && operation === 'list') {
+				const response = await oneteamApiRequest.call(
+					this,
+					'GET',
+					`/v2/organisations/${organisation.id}/courses`,
+				);
+				pushApiRows(returnData, response);
+				continue;
+			}
+
+			if (resource === 'onboarding' && operation === 'statistics') {
+				const response = await oneteamApiRequest.call(
+					this,
+					'GET',
+					`/v2/organisations/${organisation.id}/onboarding/statistics`,
+				);
+				returnData.push({ json: (response.data as IDataObject) ?? response });
+				continue;
+			}
+
+			if (resource === 'onboarding' && operation === 'userProgress') {
+				const response = await oneteamApiRequest.call(
+					this,
+					'GET',
+					`/v2/organisations/${organisation.id}/onboarding/statistics/userprogress`,
+				);
+				pushApiRows(returnData, response);
+				continue;
+			}
+
+			if (resource === 'analytics') {
+				const qs: IDataObject = {};
+				if (operation !== 'networks') {
+					qs.metrics = this.getNodeParameter('metrics', i) as string[];
+				}
+				const pathByOperation: Record<string, string> = {
+					get: `/v1/organisations/${organisation.id}/analytics`,
+					counts: `/v1/organisations/${organisation.id}/analytics/counts`,
+					users: `/v1/organisations/${organisation.id}/analytics/users`,
+					networks: `/v1/organisations/${organisation.id}/analytics/networks`,
+				};
+
+				if (operation !== 'counts') {
+					const fromDate = this.getNodeParameter('fromDate', i) as string;
+					const toDate = this.getNodeParameter('toDate', i) as string;
+					if (fromDate) qs.from_date = fromDate.slice(0, 10);
+					if (toDate) qs.to_date = toDate.slice(0, 10);
+				}
+
+				const response = await oneteamApiRequest.call(
+					this,
+					'GET',
+					pathByOperation[operation],
+					{},
+					qs,
+				);
+
+				if (operation === 'users') {
+					pushApiRows(returnData, response);
+				} else {
+					returnData.push({ json: (response.data as IDataObject) ?? response });
+				}
 			}
 		}
 

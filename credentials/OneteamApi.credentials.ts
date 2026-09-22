@@ -21,7 +21,7 @@ export class OneteamApi implements ICredentialType {
 			default: '',
 			required: true,
 			description:
-				'Create a token in Oneteam under Organisation Settings → Service Accounts. It starts with sa_ and is shown once. Typical scopes: webhooks.manage, forms.view-report, users.create, users.manage, organisation-messages.create. Listing forms and courses does not need an extra scope. Reading form answers still needs forms.view-report.',
+				'Create a token in Oneteam under Organisation Settings → Service Accounts. It starts with sa_ and is shown once. Typical scopes: webhooks.manage, forms.view-report, users.create, users.manage, organisation-messages.create, onboarding.statistics, analytics.view. Listing forms and courses does not need an extra scope. Reading form answers still needs forms.view-report.',
 		},
 		{
 			displayName: 'Base URL',

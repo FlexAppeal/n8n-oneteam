@@ -14,6 +14,8 @@ export enum WebhookEventType {
 	TEAM_USER_REMOVED = 'team.user_removed',
 	COURSE_COMPLETED = 'course.completed',
 	FORM_SUBMISSION_CREATED = 'form.submission_created',
+	TASK_CREATED = 'task.created',
+	TASK_ASSIGNED = 'task.assigned',
 	USER_ANNIVERSARY = 'user.anniversary',
 	USER_BIRTHDAY = 'user.birthday',
 	USER_CONTRACT_ENDING = 'user.contract_ending',
@@ -95,6 +97,16 @@ export const WEBHOOK_EVENTS: EventDefinition[] = [
 		event: WebhookEventType.FORM_SUBMISSION_CREATED,
 		name: 'New Form Submission',
 		description: 'A form submission is received',
+	},
+	{
+		event: WebhookEventType.TASK_CREATED,
+		name: 'Task Created',
+		description: 'A task is created',
+	},
+	{
+		event: WebhookEventType.TASK_ASSIGNED,
+		name: 'Task Assigned',
+		description: 'A task is assigned to an employee',
 	},
 	{
 		event: WebhookEventType.USER_ANNIVERSARY,

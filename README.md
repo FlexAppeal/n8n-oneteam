@@ -13,9 +13,14 @@ The GitHub repo and npm package are both `n8n-oneteam`.
 | **Oneteam Trigger** | Subscribe to an event | `POST/DELETE /v1/organisations/{id}/webhooks` |
 | New Form Submission | Optional form filter + hydrate answers | `GET …/forms/{id}/submissions/{id}` |
 | Course Completed | Optional course filter | `GET …/courses` |
+| Task Created / Task Assigned | Task webhooks | `POST/DELETE …/webhooks` |
 | **Oneteam** → Invite / Update employee | Creates / updates a user | `POST/PUT /v2/organisations/{id}/users` |
 | **Oneteam** → Membership | Add/remove network, function, team | `PUT …/users/{id}/networks\|functions\|teams` |
 | **Oneteam** → Organization message | Post an organization message | `POST …/organisation_messages` |
+| **Oneteam** → Form | List forms, list or get submissions | `GET …/forms` and `GET …/forms/{id}/submissions` |
+| **Oneteam** → Course | List courses | `GET …/courses` |
+| **Oneteam** → Onboarding | Statistics and user progress | `GET …/onboarding/statistics` |
+| **Oneteam** → Analytics | Organisation metrics, counts, users, networks | `GET …/analytics` |
 
 `user.anonymized` is not offered as a trigger.
 
@@ -38,7 +43,7 @@ localhost. `start:n8n` sets that and loads compiled nodes from `dist`
 Then add credentials:
 
 1. Organisation Settings → Service Accounts
-2. Scopes: `webhooks.manage`, `forms.view-report`, `users.create`, `users.manage`, `organisation-messages.create`
+2. Scopes: `webhooks.manage`, `forms.view-report`, `users.create`, `users.manage`, `organisation-messages.create`, `onboarding.statistics`, `analytics.view`
 
 Listing forms and courses works for any service account. Reading form answers still needs `forms.view-report`.
 3. Token starts with `sa_`
