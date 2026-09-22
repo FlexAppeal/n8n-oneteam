@@ -42,7 +42,7 @@ export class Oneteam implements INodeType {
 				noDataExpression: true,
 				options: [
 					{ name: 'Employee', value: 'employee' },
-					{ name: 'Feed Message', value: 'feedMessage' },
+					{ name: 'Organization Message', value: 'feedMessage' },
 					{ name: 'Membership', value: 'membership' },
 				],
 				default: 'employee',
@@ -79,8 +79,8 @@ export class Oneteam implements INodeType {
 					{
 						name: 'Create',
 						value: 'create',
-						action: 'Create a feed message',
-						description: 'Create a message on the organisation feed',
+						action: 'Create an organization message',
+						description: 'Create an organization message',
 					},
 				],
 				default: 'create',

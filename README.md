@@ -1,7 +1,7 @@
 # n8n-oneteam
 
 n8n community nodes for [Oneteam](https://www.oneteam.io). 
-service-account tokens (`sa_…`), REST-hook webhooks, invite/update employee, memberships, feed messages.
+service-account tokens (`sa_…`), REST-hook webhooks, invite/update employee, memberships, organization messages.
 
 The GitHub repo and npm package are both `n8n-oneteam`.
 
@@ -12,9 +12,10 @@ The GitHub repo and npm package are both `n8n-oneteam`.
 | Credential **Oneteam API** | `sa_…` token + optional base URL | `GET /v1/organisations` |
 | **Oneteam Trigger** | Subscribe to an event | `POST/DELETE /v1/organisations/{id}/webhooks` |
 | New Form Submission | Optional form filter + hydrate answers | `GET …/forms/{id}/submissions/{id}` |
+| Course Completed | Optional course filter | `GET …/courses` |
 | **Oneteam** → Invite / Update employee | Creates / updates a user | `POST/PUT /v2/organisations/{id}/users` |
 | **Oneteam** → Membership | Add/remove network, function, team | `PUT …/users/{id}/networks\|functions\|teams` |
-| **Oneteam** → Feed message | Post to the organisation feed | `POST …/organisation_messages` |
+| **Oneteam** → Organization message | Post an organization message | `POST …/organisation_messages` |
 
 `user.anonymized` is not offered as a trigger.
 
@@ -38,6 +39,8 @@ Then add credentials:
 
 1. Organisation Settings → Service Accounts
 2. Scopes: `webhooks.manage`, `forms.view-report`, `users.create`, `users.manage`, `organisation-messages.create`
+
+Listing forms and courses works for any service account. Reading form answers still needs `forms.view-report`.
 3. Token starts with `sa_`
 
 `Base URL` defaults to `https://api.oneteam.io`. Use your API host for staging.

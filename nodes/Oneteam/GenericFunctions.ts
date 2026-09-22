@@ -43,8 +43,137 @@ export async function oneteamApiRequest(
 			},
 		)) as IDataObject;
 	} catch (error) {
+		const statusCode = readStatusCode(error);
+		const detail = readErrorDetail(error);
+
+		if (statusCode === 429) {
+			throw new NodeOperationError(
+				this.getNode(),
+				'Oneteam rate limit reached. Wait a moment and try again.',
+			);
+		}
+
+		if (statusCode === 401) {
+			throw new NodeOperationError(
+				this.getNode(),
+				detail ??
+					'Your Oneteam token is invalid or revoked. Open credentials and paste a new service account token from Organisation Settings → Service Accounts.',
+			);
+		}
+
+		if (statusCode === 403) {
+			throw new NodeOperationError(
+				this.getNode(),
+				permissionErrorMessage(detail),
+			);
+		}
+
+		if (detail) {
+			throw new NodeOperationError(this.getNode(), detail);
+		}
+
+		if (statusCode !== undefined) {
+			throw new NodeOperationError(
+				this.getNode(),
+				`Oneteam API request failed (${statusCode}).`,
+			);
+		}
+
 		throw new NodeApiError(this.getNode(), error as JsonObject);
 	}
+}
+
+function readStatusCode(error: unknown): number | undefined {
+	if (!error || typeof error !== 'object') return undefined;
+
+	const record = error as Record<string, unknown>;
+	const response = record.response as Record<string, unknown> | undefined;
+	const body = record.error as Record<string, unknown> | undefined;
+	const candidates = [
+		record.statusCode,
+		record.httpCode,
+		response?.statusCode,
+		response?.status,
+		body?.status_code,
+	];
+
+	for (const candidate of candidates) {
+		const code = Number(candidate);
+		if (Number.isFinite(code) && code >= 400) return code;
+	}
+
+	return undefined;
+}
+
+function readErrorDetail(error: unknown): string | undefined {
+	if (!error || typeof error !== 'object') return undefined;
+
+	const record = error as Record<string, unknown>;
+	const response = record.response as Record<string, unknown> | undefined;
+	const cause = record.cause as Record<string, unknown> | undefined;
+	const causeResponse = cause?.response as Record<string, unknown> | undefined;
+	const bodies = [
+		record.error,
+		response?.body,
+		response?.data,
+		causeResponse?.body,
+		causeResponse?.data,
+	];
+
+	for (const body of bodies) {
+		const parsed = parseErrorBody(body);
+		if (!parsed) continue;
+
+		const detail = parsed.detail;
+		const message = parsed.message;
+		const errorField = parsed.error;
+
+		if (typeof detail === 'string' && detail.trim()) return detail.trim();
+		if (typeof message === 'string' && message.trim()) return message.trim();
+		if (typeof errorField === 'string' && errorField.trim()) {
+			return errorField.trim();
+		}
+	}
+
+	return undefined;
+}
+
+function parseErrorBody(
+	body: unknown,
+): Record<string, unknown> | undefined {
+	if (!body) return undefined;
+
+	if (typeof body === 'string') {
+		try {
+			const parsed = JSON.parse(body) as unknown;
+			if (parsed && typeof parsed === 'object') {
+				return parsed as Record<string, unknown>;
+			}
+		} catch {
+			return undefined;
+		}
+
+		return undefined;
+	}
+
+	if (typeof body === 'object') {
+		return body as Record<string, unknown>;
+	}
+
+	return undefined;
+}
+
+function permissionErrorMessage(detail: string | undefined): string {
+	const guidance =
+		'Add the missing scope in Oneteam under Organisation Settings → Service Accounts.';
+
+	if (!detail) {
+		return `This service account does not have permission for this action. ${guidance}`;
+	}
+
+	if (/service account|scope/i.test(detail)) return detail;
+
+	return `${detail} ${guidance}`;
 }
 
 export async function getOrganisation(

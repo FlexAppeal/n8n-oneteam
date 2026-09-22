@@ -73,6 +73,18 @@ export class OneteamTrigger implements INodeType {
 					show: { event: [WebhookEventType.FORM_SUBMISSION_CREATED] },
 				},
 			},
+			{
+				displayName: 'Course Name or ID',
+				name: 'courseId',
+				type: 'options',
+				typeOptions: { loadOptionsMethod: 'getCourses' },
+				default: '',
+				description:
+					'Only trigger for this course. Leave empty to trigger for every course. Choose from the list, or specify an ID using an expression.',
+				displayOptions: {
+					show: { event: [WebhookEventType.COURSE_COMPLETED] },
+				},
+			},
 		],
 	};
 
@@ -82,6 +94,11 @@ export class OneteamTrigger implements INodeType {
 				this: ILoadOptionsFunctions,
 			): Promise<INodePropertyOptions[]> {
 				return listResourceOptions.call(this, 'forms', 'title');
+			},
+			async getCourses(
+				this: ILoadOptionsFunctions,
+			): Promise<INodePropertyOptions[]> {
+				return listResourceOptions.call(this, 'courses', 'name');
 			},
 		},
 	};
@@ -152,6 +169,16 @@ export class OneteamTrigger implements INodeType {
 
 		if (envelope.type && envelope.type !== event) {
 			return { noWebhookResponse: true };
+		}
+
+		if (event === WebhookEventType.COURSE_COMPLETED) {
+			const courseId = this.getNodeParameter('courseId', '') as string;
+			const data = envelope.data as IDataObject | undefined;
+			const course = data?.course as IDataObject | undefined;
+
+			if (courseId && String(course?.id) !== String(courseId)) {
+				return { noWebhookResponse: true };
+			}
 		}
 
 		if (event === WebhookEventType.FORM_SUBMISSION_CREATED) {
