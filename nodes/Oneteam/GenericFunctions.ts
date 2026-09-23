@@ -39,6 +39,7 @@ export async function oneteamApiRequest(
 				url: `${baseUrl}${path}`,
 				body: Object.keys(body).length ? body : undefined,
 				qs: Object.keys(qs).length ? qs : undefined,
+				arrayFormat: 'brackets',
 				json: true,
 			},
 		)) as IDataObject;
@@ -64,7 +65,14 @@ export async function oneteamApiRequest(
 		if (statusCode === 403) {
 			throw new NodeOperationError(
 				this.getNode(),
-				permissionErrorMessage(detail),
+				permissionErrorMessage(detail, path),
+			);
+		}
+
+		if (isInvalidCursorError(detail)) {
+			throw new NodeOperationError(
+				this.getNode(),
+				'Invalid pagination cursor. Copy the Next Page value from the nextPage column of the previous run output table, or leave Next Page empty to start from the first page.',
 			);
 		}
 
@@ -163,17 +171,48 @@ function parseErrorBody(
 	return undefined;
 }
 
-function permissionErrorMessage(detail: string | undefined): string {
-	const guidance =
-		'Add the missing scope in Oneteam under Organisation Settings → Service Accounts.';
+function isInvalidCursorError(detail: string | undefined): boolean {
+	return detail !== undefined && /pagination cursor/i.test(detail);
+}
 
-	if (!detail) {
-		return `This service account does not have permission for this action. ${guidance}`;
+function permissionErrorMessage(
+	detail: string | undefined,
+	path: string,
+): string {
+	const where =
+		'Add it on the service account in Oneteam under Organisation Settings → Service Accounts, then paste a new token into the credential.';
+
+	if (/\/forms\/?$/.test(path) || /\/courses\/?$/.test(path)) {
+		return 'Listing forms and courses does not need an extra scope. This token cannot list them for this organisation. Use an organisation service account token.';
 	}
 
-	if (/service account|scope/i.test(detail)) return detail;
+	const scope = scopeForPath(path);
+	if (scope) {
+		return `This action needs the ${scope} scope. ${where}`;
+	}
 
-	return `${detail} ${guidance}`;
+	if (detail && /network/i.test(detail)) return detail;
+
+	if (detail && /scope|service account/i.test(detail)) return detail;
+
+	return `This service account does not have permission for this action. ${where}`;
+}
+
+function scopeForPath(path: string): string | undefined {
+	if (/\/forms\/[^/]+\/submissions/.test(path)) return 'forms.view-report';
+	if (/\/courses\/[^/]+\/(statistics|feedback)/.test(path)) {
+		return 'academy-courses.statistics';
+	}
+	if (/\/onboarding\/statistics/.test(path)) return 'onboarding.statistics';
+	if (/\/analytics|\/metrics\//.test(path)) return 'analytics.view';
+	if (/\/surveys/.test(path)) return 'surveys.view-report';
+	if (/\/performance\/reports/.test(path)) {
+		return 'performance-review-evaluations.view-all';
+	}
+	if (/\/organisation_messages/.test(path)) return 'organisation-messages.create';
+	if (/\/webhooks/.test(path)) return 'webhooks.manage';
+	if (/\/users/.test(path)) return 'users.manage';
+	return undefined;
 }
 
 export async function getOrganisation(
@@ -221,38 +260,45 @@ export async function listResourceOptions(
 	}));
 }
 
-async function listAllPages(
+export async function listAllPages(
 	this: OneteamContext,
 	path: string,
+	qs: IDataObject = {},
 ): Promise<IDataObject[]> {
 	const rows: IDataObject[] = [];
 	const seenCursors = new Set<string>();
 	let cursor: string | undefined;
 
 	do {
-		const response = await oneteamApiRequest.call(
-			this,
-			'GET',
-			path,
-			{},
-			cursor ? { cursor } : {},
-		);
-		rows.push(...((response.data as IDataObject[]) ?? []));
-
-		const meta = response.meta as IDataObject | undefined;
-		const pagination = meta?.pagination as IDataObject | undefined;
-		const nextCursor = pagination?.next_cursor;
-		if (
-			typeof nextCursor !== 'string' ||
-			nextCursor.length === 0 ||
-			seenCursors.has(nextCursor)
-		) {
-			cursor = undefined;
-		} else {
-			seenCursors.add(nextCursor);
-			cursor = nextCursor;
-		}
+		const page = await listPage.call(this, path, qs, cursor);
+		rows.push(...page.rows);
+		if (!page.nextPage || seenCursors.has(page.nextPage)) break;
+		seenCursors.add(page.nextPage);
+		cursor = page.nextPage;
 	} while (cursor);
 
 	return rows;
+}
+
+export async function listPage(
+	this: OneteamContext,
+	path: string,
+	qs: IDataObject = {},
+	cursor?: string,
+): Promise<{ rows: IDataObject[]; nextPage: string }> {
+	const response = await oneteamApiRequest.call(
+		this,
+		'GET',
+		path,
+		{},
+		cursor ? { ...qs, cursor } : qs,
+	);
+	const meta = response.meta as IDataObject | undefined;
+	const pagination = meta?.pagination as IDataObject | undefined;
+	const nextCursor = pagination?.next_cursor;
+
+	return {
+		rows: (response.data as IDataObject[]) ?? [],
+		nextPage: typeof nextCursor === 'string' ? nextCursor : '',
+	};
 }
