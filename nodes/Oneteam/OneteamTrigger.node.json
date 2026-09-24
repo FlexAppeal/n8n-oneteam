@@ -1,5 +1,5 @@
 {
-  "node": "n8n-oneteam.oneteamTrigger",
+  "node": "n8n-nodes-oneteam.oneteamTrigger",
   "nodeVersion": "1.0",
   "codexVersion": "1.0",
   "categories": ["Communication"],

@@ -4,10 +4,11 @@ import type {
 	IHookFunctions,
 	IHttpRequestMethods,
 	ILoadOptionsFunctions,
+	INodeListSearchResult,
+	INodeProperties,
 	IWebhookFunctions,
-	JsonObject,
 } from 'n8n-workflow';
-import { NodeApiError, NodeOperationError } from 'n8n-workflow';
+import { NodeOperationError } from 'n8n-workflow';
 
 type OneteamContext =
 	| IExecuteFunctions
@@ -80,14 +81,24 @@ export async function oneteamApiRequest(
 			throw new NodeOperationError(this.getNode(), detail);
 		}
 
+		const fallback =
+			error instanceof Error && error.message.trim()
+				? error.message.trim()
+				: undefined;
+
 		if (statusCode !== undefined) {
 			throw new NodeOperationError(
 				this.getNode(),
-				`Oneteam API request failed (${statusCode}).`,
+				fallback
+					? `Oneteam API request failed (${statusCode}): ${fallback}`
+					: `Oneteam API request failed (${statusCode}).`,
 			);
 		}
 
-		throw new NodeApiError(this.getNode(), error as JsonObject);
+		throw new NodeOperationError(
+			this.getNode(),
+			fallback ?? 'Oneteam API request failed.',
+		);
 	}
 }
 
@@ -188,6 +199,16 @@ function permissionErrorMessage(
 
 	const scope = scopeForPath(path);
 	if (scope) {
+		// A 403 after the scope is present is a different permission failure.
+		// Only rewrite the response when the API itself says the scope is missing.
+		if (
+			detail &&
+			!/missing the .+ permission/i.test(detail) &&
+			!/scope/i.test(detail)
+		) {
+			return detail;
+		}
+
 		return `This action needs the ${scope} scope. ${where}`;
 	}
 
@@ -199,7 +220,9 @@ function permissionErrorMessage(
 }
 
 function scopeForPath(path: string): string | undefined {
+	if (/\/forms\/[^/]+\/screens/.test(path)) return 'forms.create';
 	if (/\/forms\/[^/]+\/submissions/.test(path)) return 'forms.view-report';
+	if (/\/forms\/?$/.test(path) && !/submissions/.test(path)) return 'forms.create';
 	if (/\/courses\/[^/]+\/(statistics|feedback)/.test(path)) {
 		return 'academy-courses.statistics';
 	}
@@ -210,7 +233,13 @@ function scopeForPath(path: string): string | undefined {
 		return 'performance-review-evaluations.view-all';
 	}
 	if (/\/organisation_messages/.test(path)) return 'organisation-messages.create';
+	if (/\/tasks\/?$/.test(path)) return 'tasks.create';
+	if (/\/tasks\/.+\/response_status/.test(path)) return 'tasks.update';
+	if (/\/forms\/.+\/response_status/.test(path)) return 'forms.update-submission';
+	if (/\/notifications/.test(path)) return 'notifications.send';
+	if (/\/chat\/messages/.test(path)) return 'chat-messages.create';
 	if (/\/webhooks/.test(path)) return 'webhooks.manage';
+	if (/\/users\/?$/.test(path)) return 'users.view';
 	if (/\/users/.test(path)) return 'users.manage';
 	return undefined;
 }
@@ -251,7 +280,7 @@ export async function listResourceOptions(
 	const organisation = await getOrganisation.call(this);
 	const rows = await listAllPages.call(
 		this,
-		`/${apiVersion}/organisations/${organisation.id}/${path}`,
+		organisationPath(organisation.id, path, apiVersion),
 	);
 
 	return rows.map((row) => ({
@@ -259,6 +288,153 @@ export async function listResourceOptions(
 		value: String(row.id),
 	}));
 }
+
+export function locatorId(value: unknown): string {
+	if (value == null || value === '') return '';
+	if (typeof value === 'string' || typeof value === 'number') {
+		return String(value);
+	}
+	if (typeof value === 'object' && value !== null && 'value' in value) {
+		return String((value as { value: unknown }).value ?? '');
+	}
+	return '';
+}
+
+export async function searchListedResource(
+	this: ILoadOptionsFunctions,
+	options: {
+		apiVersion?: 'v1' | 'v2';
+		path: string;
+		nameFields: string[];
+		filter?: string;
+		paginationToken?: string;
+		qs?: IDataObject;
+		minQueryLength?: number;
+		filterLocally?: boolean;
+	},
+): Promise<INodeListSearchResult> {
+	const organisation = await getOrganisation.call(this);
+	const apiVersion = options.apiVersion ?? 'v1';
+	const qs: IDataObject = { ...(options.qs ?? {}) };
+	const query = options.filter?.trim();
+	if (
+		query &&
+		!options.filterLocally &&
+		query.length >= (options.minQueryLength ?? 0)
+	) {
+		qs.q = query;
+	}
+
+	const page = await listPage.call(
+		this,
+		organisationPath(organisation.id, options.path, apiVersion),
+		qs,
+		options.paginationToken,
+	);
+	let results = page.rows
+		.filter((row) => row.id !== undefined && row.id !== null)
+		.map((row) => {
+			const label = options.nameFields
+				.map((field) => row[field])
+				.find((value) => value !== undefined && value !== null && value !== '');
+			return {
+				name: String(label ?? row.id),
+				value: String(row.id),
+			};
+		});
+
+	if (options.filterLocally && query) {
+		const needle = query.toLowerCase();
+		results = results.filter((row) => row.name.toLowerCase().includes(needle));
+	}
+
+	return {
+		results,
+		paginationToken: page.nextPage || undefined,
+	};
+}
+
+export function organisationPath(
+	organisationId: string,
+	resourcePath: string,
+	version: 'v1' | 'v2' = 'v1',
+): string {
+	const suffix = resourcePath.replace(/^\//, '');
+	return `/${version}/organisations/${organisationId}/${suffix}`;
+}
+
+export function apiRecord(response: IDataObject): IDataObject {
+	return (response.data as IDataObject) ?? response;
+}
+
+export function searchLocator(
+	displayName: string,
+	name: string,
+	method: string,
+	options: {
+		displayOptions?: INodeProperties['displayOptions'];
+		description?: string;
+		required?: boolean;
+		idPlaceholder?: string;
+	} = {},
+): INodeProperties {
+	return {
+		displayName,
+		name,
+		type: 'resourceLocator',
+		default: { mode: 'list', value: '' },
+		required: options.required ?? true,
+		description: options.description,
+		displayOptions: options.displayOptions,
+		modes: [
+			{
+				displayName: 'From List',
+				name: 'list',
+				type: 'list',
+				typeOptions: {
+					searchListMethod: method,
+					searchable: true,
+				},
+			},
+			{
+				displayName: 'By ID',
+				name: 'id',
+				type: 'string',
+				placeholder: options.idPlaceholder ?? 'ID',
+			},
+		],
+	};
+}
+
+export const formAndCourseSearch = {
+	async searchForms(
+		this: ILoadOptionsFunctions,
+		filter?: string,
+		paginationToken?: string,
+	): Promise<INodeListSearchResult> {
+		return searchListedResource.call(this, {
+			path: 'forms',
+			nameFields: ['title', 'name'],
+			filter,
+			paginationToken,
+			minQueryLength: 3,
+		});
+	},
+	async searchCourses(
+		this: ILoadOptionsFunctions,
+		filter?: string,
+		paginationToken?: string,
+	): Promise<INodeListSearchResult> {
+		return searchListedResource.call(this, {
+			apiVersion: 'v2',
+			path: 'courses',
+			nameFields: ['name', 'title'],
+			filter,
+			paginationToken,
+			filterLocally: true,
+		});
+	},
+};
 
 export async function listAllPages(
 	this: OneteamContext,

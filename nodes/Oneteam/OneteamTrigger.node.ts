@@ -1,8 +1,6 @@
 import type {
 	IDataObject,
 	IHookFunctions,
-	ILoadOptionsFunctions,
-	INodePropertyOptions,
 	INodeType,
 	INodeTypeDescription,
 	IWebhookFunctions,
@@ -10,9 +8,12 @@ import type {
 } from 'n8n-workflow';
 import { WEBHOOK_EVENTS, WebhookEventType } from './events';
 import {
+	apiRecord,
+	formAndCourseSearch,
 	getOrganisation,
-	listResourceOptions,
 	oneteamApiRequest,
+	organisationPath,
+	searchLocator,
 } from './GenericFunctions';
 
 type WebhookStaticData = {
@@ -61,46 +62,29 @@ export class OneteamTrigger implements INodeType {
 				default: WebhookEventType.USER_INVITED,
 				required: true,
 			},
-			{
-				displayName: 'Form Name or ID',
-				name: 'formId',
-				type: 'options',
-				typeOptions: { loadOptionsMethod: 'getForms' },
-				default: '',
+			searchLocator('Form Name or ID', 'formId', 'searchForms', {
+				required: false,
+				idPlaceholder: 'Form ID',
 				description:
-					'Only trigger for this form. Leave empty to trigger for every form. Choose from the list, or specify an ID using an expression.',
+					'Only trigger for this form. Leave empty to trigger for every form. Search by title (3+ characters), or paste an ID.',
 				displayOptions: {
 					show: { event: [WebhookEventType.FORM_SUBMISSION_CREATED] },
 				},
-			},
-			{
-				displayName: 'Course Name or ID',
-				name: 'courseId',
-				type: 'options',
-				typeOptions: { loadOptionsMethod: 'getCourses' },
-				default: '',
+			}),
+			searchLocator('Course Name or ID', 'courseId', 'searchCourses', {
+				required: false,
+				idPlaceholder: 'Course ID',
 				description:
-					'Only trigger for this course. Leave empty to trigger for every course. Choose from the list, or specify an ID using an expression.',
+					'Only trigger for this course. Leave empty to trigger for every course. Search by name, or paste an ID.',
 				displayOptions: {
 					show: { event: [WebhookEventType.COURSE_COMPLETED] },
 				},
-			},
+			}),
 		],
 	};
 
 	methods = {
-		loadOptions: {
-			async getForms(
-				this: ILoadOptionsFunctions,
-			): Promise<INodePropertyOptions[]> {
-				return listResourceOptions.call(this, 'forms', 'title');
-			},
-			async getCourses(
-				this: ILoadOptionsFunctions,
-			): Promise<INodePropertyOptions[]> {
-				return listResourceOptions.call(this, 'courses', 'name');
-			},
-		},
+		listSearch: formAndCourseSearch,
 	};
 
 	webhookMethods = {
@@ -119,14 +103,14 @@ export class OneteamTrigger implements INodeType {
 				const response = await oneteamApiRequest.call(
 					this,
 					'POST',
-					`/v1/organisations/${organisation.id}/webhooks`,
+					organisationPath(organisation.id, 'webhooks'),
 					{
 						url: webhookUrl,
 						events: [event],
 						description: `n8n: ${event}`,
 					},
 				);
-				const created = (response.data as IDataObject) ?? response;
+				const created = apiRecord(response);
 				const webhookData = this.getWorkflowStaticData(
 					'node',
 				) as WebhookStaticData;
@@ -149,7 +133,10 @@ export class OneteamTrigger implements INodeType {
 					await oneteamApiRequest.call(
 						this,
 						'DELETE',
-						`/v1/organisations/${webhookData.organisationId}/webhooks/${webhookData.webhookId}`,
+						organisationPath(
+							webhookData.organisationId,
+							`webhooks/${webhookData.webhookId}`,
+						),
 					);
 				} catch {
 					// Already gone is a successful unsubscribe.
@@ -172,7 +159,9 @@ export class OneteamTrigger implements INodeType {
 		}
 
 		if (event === WebhookEventType.COURSE_COMPLETED) {
-			const courseId = this.getNodeParameter('courseId', '') as string;
+			const courseId = this.getNodeParameter('courseId', '', {
+				extractValue: true,
+			}) as string;
 			const data = envelope.data as IDataObject | undefined;
 			const course = data?.course as IDataObject | undefined;
 
@@ -182,7 +171,9 @@ export class OneteamTrigger implements INodeType {
 		}
 
 		if (event === WebhookEventType.FORM_SUBMISSION_CREATED) {
-			const formId = this.getNodeParameter('formId', '') as string;
+			const formId = this.getNodeParameter('formId', '', {
+				extractValue: true,
+			}) as string;
 			const data = envelope.data as IDataObject | undefined;
 			const form = data?.form as IDataObject | undefined;
 
@@ -198,7 +189,10 @@ export class OneteamTrigger implements INodeType {
 					const detail = await oneteamApiRequest.call(
 						this,
 						'GET',
-						`/v1/organisations/${organisation.id}/forms/${form.id}/submissions/${submission.id}`,
+						organisationPath(
+							organisation.id,
+							`forms/${form.id}/submissions/${submission.id}`,
+						),
 					);
 
 					return {

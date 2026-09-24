@@ -3,7 +3,7 @@
 n8n community nodes for [Oneteam](https://www.oneteam.io). 
 service-account tokens (`sa_…`), REST-hook webhooks, invite/update employee, memberships, organization messages.
 
-The GitHub repo and npm package are both `n8n-oneteam`.
+The GitHub repo is `n8n-oneteam`. The npm package is `n8n-nodes-oneteam` (n8n requires the `n8n-nodes-` prefix to install from the UI).
 
 ## What is in here
 
@@ -17,7 +17,12 @@ The GitHub repo and npm package are both `n8n-oneteam`.
 | **Oneteam** → Invite / Update employee | Creates / updates a user | `POST/PUT /v2/organisations/{id}/users` |
 | **Oneteam** → Membership | Add/remove network, function, team | `PUT …/users/{id}/networks\|functions\|teams` |
 | **Oneteam** → Organization message | Post an organization message | `POST …/organisation_messages` |
-| **Oneteam** → Form | List forms, list or get submissions | `GET …/forms` and `GET …/forms/{id}/submissions` |
+| **Oneteam** → Form | List forms, list or get submissions, update submission status | `GET …/forms`, `GET …/forms/{id}/submissions`, `PATCH …/forms/{id}/submissions/{id}/response_status` |
+| **Oneteam** → Task → List | List tasks in the organisation | `GET …/forms?type=task` |
+| **Oneteam** → Task → Create | One-time or recurring, individually or as a team, audience, questions | `POST /v1/…/forms` with `form_type: task`, `POST …/screens` for questions, then `PUT …/forms/{id}` to publish |
+| **Oneteam** → Task → Update status | Set the response status of a task submission | `PATCH …/tasks/{id}/submissions/{id}/response_status` |
+| **Oneteam** → Push notification | Send a push to one employee | `POST …/notifications` |
+| **Oneteam** → Chat message | Send a private message. Attachment is an existing Oneteam file id | `POST …/chat/messages` |
 | **Oneteam** → Course | List courses | `GET …/courses` |
 | **Oneteam** → Onboarding | Statistics and user progress | `GET …/onboarding/statistics` |
 | **Oneteam** → Analytics | Organisation metrics, counts, users, networks | `GET …/analytics` |
@@ -43,12 +48,23 @@ localhost. `start:n8n` sets that and loads compiled nodes from `dist`
 Then add credentials:
 
 1. Organisation Settings → Service Accounts
-2. Scopes: `webhooks.manage`, `forms.view-report`, `users.create`, `users.manage`, `organisation-messages.create`, `onboarding.statistics`, `analytics.view`
+2. Scopes: `webhooks.manage`, `forms.view-report`, `forms.create`, `forms.update-submission`, `users.create`, `users.view`, `users.manage`, `organisation-messages.create`, `onboarding.statistics`, `analytics.view`, `tasks.create`, `tasks.update`, `notifications.send`, `chat-messages.create`
 
 Listing forms and courses works for any service account. Reading form answers still needs `forms.view-report`.
 3. Token starts with `sa_`
 
 `Base URL` defaults to `https://api.oneteam.io`. Use your API host for staging.
+
+### Service account token
+
+Every action in this node runs on a service-account token (`sa_…`).
+
+- **Task → Create** needs `forms.create`. The form, its questions and the
+  publish step are attributed to the user who created the service account.
+- Employee pickers need `users.view` (`GET /v2/organisations/{id}/users`).
+  `users.manage` also grants the list. Bearer responses include id, name and
+  email only.
+- Reading a form, including its response statuses, needs `forms.view-report`.
 
 ## Relation to other repos
 

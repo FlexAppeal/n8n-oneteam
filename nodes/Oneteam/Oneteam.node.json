@@ -1,5 +1,5 @@
 {
-  "node": "n8n-oneteam.oneteam",
+  "node": "n8n-nodes-oneteam.oneteam",
   "nodeVersion": "1.0",
   "codexVersion": "1.0",
   "categories": ["Communication"],

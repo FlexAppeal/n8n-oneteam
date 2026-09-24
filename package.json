@@ -1,5 +1,5 @@
 {
-  "name": "n8n-oneteam",
+  "name": "n8n-nodes-oneteam",
   "version": "0.1.0",
   "description": "n8n nodes for Oneteam: listen to webhook events and run organisation operations",
   "license": "MIT",
