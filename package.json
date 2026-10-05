@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-oneteam",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "n8n nodes for Oneteam: listen to webhook events and run organisation operations",
   "license": "MIT",
   "homepage": "https://github.com/FlexAppeal/n8n-oneteam",
