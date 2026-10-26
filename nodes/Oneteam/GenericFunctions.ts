@@ -66,7 +66,7 @@ export async function oneteamApiRequest(
 		if (statusCode === 403) {
 			throw new NodeOperationError(
 				this.getNode(),
-				permissionErrorMessage(detail, path),
+				permissionErrorMessage(detail, path, method, body),
 			);
 		}
 
@@ -189,26 +189,22 @@ function isInvalidCursorError(detail: string | undefined): boolean {
 function permissionErrorMessage(
 	detail: string | undefined,
 	path: string,
+	method: IHttpRequestMethods,
+	body: IDataObject,
 ): string {
 	const where =
 		'Add it on the service account in Oneteam under Organisation Settings → Service Accounts, then paste a new token into the credential.';
 
-	if (/\/forms\/?$/.test(path) || /\/courses\/?$/.test(path)) {
+	// The API knows the stored form type; path-based guesses must not replace it.
+	if (detail && /missing the .+ permission|scope/i.test(detail)) return detail;
+
+	if (method === 'GET' && (/\/forms\/?$/.test(path) || /\/courses\/?$/.test(path))) {
 		return 'Listing forms and courses does not need an extra scope. This token cannot list them for this organisation. Use an organisation service account token.';
 	}
 
-	const scope = scopeForPath(path);
+	const scope = scopeForPath(path, method, body);
 	if (scope) {
-		// A 403 after the scope is present is a different permission failure.
-		// Only rewrite the response when the API itself says the scope is missing.
-		if (
-			detail &&
-			!/missing the .+ permission/i.test(detail) &&
-			!/scope/i.test(detail)
-		) {
-			return detail;
-		}
-
+		if (detail) return detail;
 		return `This action needs the ${scope} scope. ${where}`;
 	}
 
@@ -219,10 +215,22 @@ function permissionErrorMessage(
 	return `This service account does not have permission for this action. ${where}`;
 }
 
-function scopeForPath(path: string): string | undefined {
-	if (/\/forms\/[^/]+\/screens/.test(path)) return 'forms.create';
+function scopeForPath(
+	path: string,
+	method: IHttpRequestMethods,
+	body: IDataObject,
+): string | undefined {
+	if (method !== 'GET' && /\/forms(?:\/[^/]+(?:\/screens(?:\/[^/]+(?:\/duplicate)?)?)?)?\/?$/.test(path)) {
+		const settings = body.settings as IDataObject | undefined;
+		if (body.form_type === 'task' || (body.form_type === undefined && settings?.task != null)) {
+			return 'tasks.create';
+		}
+		if (body.form_type === 'standard' || /\/forms\/?$/.test(path)) return 'forms.create';
+		// Screen writes and publishing omit form_type. The URL alone cannot
+		// distinguish a task definition from a standard form.
+		return 'tasks.create for task definitions or forms.create for standard forms';
+	}
 	if (/\/forms\/[^/]+\/submissions/.test(path)) return 'forms.view-report';
-	if (/\/forms\/?$/.test(path) && !/submissions/.test(path)) return 'forms.create';
 	if (/\/courses\/[^/]+\/(statistics|feedback)/.test(path)) {
 		return 'academy-courses.statistics';
 	}
